@@ -1,0 +1,74 @@
+version: "3"
+        
+services:
+  mongo:
+    image: "mongo"
+    restart: always
+    networks:
+      - collab-network
+    deploy:
+      resources:
+          limits:
+            cpus: '1.0'
+            memory: 4096M
+
+  server:
+    depends_on:
+      - mongo
+    restart: always
+    image: thedavekwon/collab_server
+    ports:
+      - target: 8080
+        x-aws-protocol: http
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - MONGO_ADDR=mongo
+    networks:
+      - collab-network
+    deploy:
+      resources:
+          limits:
+            cpus: '1.0'
+            memory: 4096M
+          
+  client:
+    depends_on:
+      - server
+    restart: always
+    image: thedavekwon/collab_client
+    ports:
+      - 80:80
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_SERVER_ADDR=server
+      - REACT_APP_USER_POOL_ID=!Ref UserPool
+      - REACT_APP_CLIENT_ID=!Ref UserPoolClient
+    networks:
+      - collab-network
+    deploy:
+      resources:
+          limits:
+            cpus: '1.0'
+            memory: 4096M
+networks:
+  collab-network:
+    driver: bridge
+
+x-aws-cloudformation:
+  Resources:
+    UserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+
+    UserPoolClient:
+      Type: "AWS::Cognito::UserPoolClient"
+      Properties:
+        UserPoolId: '!Ref UserPool'
+        GenerateSecret: false
+        SupportedIdentityProviders:
+          - COGNITO
+        PreventUserExistenceErrors: ENABLED
